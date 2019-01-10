@@ -12,6 +12,67 @@ extern "C" {
 #include <lualib.h>
 }
 
+#if LUA_VERSION_NUM < 502
+# define LUA_OK 0
+
+namespace
+{
+    typedef std::make_unsigned<lua_Integer>::type lua_Unsigned;
+
+    lua_Number lua_tonumberx(lua_State * L, int n, int * is)
+    {
+        if (is)
+        {
+            *is = lua_isnumber(L, n);
+        }
+        return lua_tonumber(L, n);
+    }
+
+    lua_Integer lua_tointegerx(lua_State * L, int n, int * is)
+    {
+        if (is)
+        {
+            *is = lua_isnumber(L, n);
+        }
+        return lua_tointeger(L, n);
+    }
+
+    lua_Unsigned lua_tounsignedx(lua_State * L, int n, int * is)
+    {
+        return (lua_Unsigned)lua_tointegerx(L, n, is);
+    }
+
+    lua_Unsigned luaL_checkunsigned(lua_State * L, int n)
+    {
+        return (lua_Unsigned)luaL_checkinteger(L, n);
+    }
+
+    void * luaL_testudata(lua_State * L, int n, const char * t)
+    {
+        lua_getmetatable(L, n);
+        luaL_getmetatable(L, t);
+        int is = lua_rawequal(L, -1, -2);
+        lua_pop(L, 2);
+        return is ? lua_touserdata(L, n) : nullptr;
+    }
+
+    void luaL_setmetatable(lua_State * L, const char * t)
+    {
+        luaL_getmetatable(L, t);
+        lua_setmetatable(L, -2);
+    }
+
+    int lua_absindex(lua_State * L, int n)
+    {
+        if ((n < 0) && (n > LUA_REGISTRYINDEX))
+        {
+            return lua_gettop(L) + n + 1;
+        }
+        return n;
+    }
+}
+#endif
+
 /* The purpose of this header is to handle pushing and retrieving
  * primitives from the stack
  */
@@ -161,7 +222,6 @@ inline T _check_get(_id<T&&>, lua_State *l, const int index) {
 
 
 inline int _check_get(_id<int>, lua_State *l, const int index) {
-#if LUA_VERSION_NUM >= 502
     int isNum = 0;
     auto res = static_cast<int>(lua_tointegerx(l, index, &isNum));
     if(!isNum){
@@ -175,9 +235,6 @@ inline int _check_get(_id<int>, lua_State *l, const int index) {
         };
     }
     return res;
-#else
-#error "Not supported for Lua versions <5.2"
-#endif
 }
 
 inline unsigned int _check_get(_id<unsigned int>, lua_State *l, const int index) {
@@ -190,7 +247,7 @@ inline unsigned int _check_get(_id<unsigned int>, lua_State *l, const int index)
             index
         };
     }
-#elif LUA_VERSION_NUM >= 502
+#else
     auto res = static_cast<unsigned>(lua_tounsignedx(l, index, &isNum));
     if(!isNum) {
         throw GetParameterFromLuaTypeError{
@@ -198,8 +255,6 @@ inline unsigned int _check_get(_id<unsigned int>, lua_State *l, const int index)
             index
         };
     }
-#else
-#error "Not supported for Lua versions <5.2"
 #endif
     return res;
 }

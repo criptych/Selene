@@ -135,7 +135,7 @@ private:
         lua_replace(_state, handler_index);
 #else
         lua_pushvalue(_state, func_index);
-        lua_push_value(_state, handler_index);
+        lua_pushvalue(_state, handler_index);
         lua_replace(_state, func_index);
         lua_replace(_state, handler_index);
 #endif
